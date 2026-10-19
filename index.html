@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ล่าสมบัติมรณะ - คณิตศาสตร์ ป.2</title>
+    <!-- Google Font: Mitr -->
+    <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- MediaPipe Hands & Camera Utils CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Mitr', sans-serif;
+            user-select: none;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #111;
+        }
+
+        #webcam-video {
+            display: none;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Screen Layout & Overlay */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(20, 24, 82, 0.95), rgba(75, 19, 115, 0.95));
+            color: #fff;
+            transition: opacity 0.3s ease;
+        }
+
+        .screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+            display: none;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            border-radius: 24px;
+            padding: 35px;
+            width: 620px;
+            max-width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            font-size: 2.6rem;
+            color: #FFD700;
+            margin-bottom: 15px;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+
+        p, li {
+            font-size: 1.05rem;
+            color: #f1f2f6;
+            line-height: 1.6;
+        }
+
+        ul {
+            text-align: left;
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+
+        /* System Check List */
+        .check-list {
+            margin: 20px 0;
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .check-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 12px 0;
+            font-size: 1.2rem;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top: 3px solid #FFD700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .check-status {
+            font-weight: bold;
+        }
+        .check-status.success { color: #2ecc71; }
+        .check-status.error { color: #e74c3c; }
+
+        /* Buttons */
+        .btn {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #27ae60, 0 10px 20px rgba(0,0,0,0.3);
+            transition: all 0.1s ease;
+            margin-top: 10px;
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #27ae60, 0 5px 10px rgba(0,0,0,0.3);
+        }
+
+        .btn:disabled {
+            background: #7f8c8d;
+            box-shadow: 0 6px 0 #6d7f81;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* HUD & Gameplay UI */
+        #game-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
+            display: none;
+        }
+
+        .hud-top {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(6px);
+            padding: 10px 25px;
+            border-radius: 30px;
+            border: 2px solid rgba(255,215,0,0.3);
+            pointer-events: auto;
+        }
+
+        .hud-box {
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+            min-width: 90px;
+        }
+
+        .hud-box span {
+            display: block;
+            color: #FFD700;
+            font-size: 1.35rem;
+        }
+
+        #notification-banner {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75);
+            color: #FFD700;
+            padding: 6px 24px;
+            border-radius: 20px;
+            font-size: 1.15rem;
+            font-weight: 500;
+            border: 1px solid rgba(255,215,0,0.4);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        #popup-center {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            font-size: 3.8rem;
+            font-weight: 700;
+            opacity: 0;
+            transition: all 0.25s ease;
+            pointer-events: none;
+            z-index: 20;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+        }
+        #popup-center.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.15);
+        }
+        .popup-green { color: #2ecc71; }
+        .popup-red { color: #e74c3c; }
+
+        .side-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: auto;
+        }
+
+        .toggle-btn {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #27ae60;
+            transition: all 0.08s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-width: 140px;
+        }
+        .toggle-btn.off {
+            background: #2c3e50;
+            box-shadow: 0 4px 0 #1a252f;
+        }
+        .toggle-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #27ae60;
+        }
+        .toggle-btn.off:active {
+            box-shadow: 0 1px 0 #1a252f;
+        }
+
+        .zone-divider-left {
+            position: absolute;
+            top: 0;
+            left: 25%;
+            width: 2px;
+            height: 100%;
+            background: rgba(255, 215, 0, 0.2);
+            pointer-events: none;
+        }
+        .zone-divider-right {
+            position: absolute;
+            top: 0;
+            left: 75%;
+            width: 2px;
+            height: 100%;
+            background: rgba(255, 215, 0, 0.2);
+            pointer-events: none;
+        }
+        .zone-left-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 25%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.15);
+            pointer-events: none;
+        }
+        .zone-right-bg {
+            position: absolute;
+            top: 0;
+            left: 75%;
+            width: 25%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.15);
+            pointer-events: none;
+        }
+
+        .word-label {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #FFD700;
+            color: #FFD700;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 4;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+        }
+
+        #charge-hud-container {
+            position: absolute;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+            z-index: 6;
+        }
+        .charge-track {
+            width: 14px;
+            height: 110px;
+            background: rgba(0,0,0,0.6);
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 7px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        .charge-fill {
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, #f39c12, #f1c40f);
+            transition: height 0.05s linear;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Hidden Video element for MediaPipe Camera Feed -->
+    <video id="webcam-video" playsinline></video>
+
+    <!-- 3D Canvas Rendering Layer -->
+    <div id="canvas-container"></div>
+
+    <!-- Screen 1: Start Screen -->
+    <div id="start-screen" class="screen">
+        <div class="card">
+            <h1>🏴‍☠️ ล่าสมบัติมรณะ</h1>
+            <p style="margin-bottom: 15px; color: #FFD700; font-weight: 500;">เกมคณิตศาสตร์ ป.2 - การอ่านตัวเลขและค่าของจำนวน</p>
+            <div style="background: rgba(0,0,0,0.25); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                <p style="font-weight: 600; color: #2ecc71; margin-bottom: 5px;">🎮 วิธีการเล่น:</p>
+                <ul>
+                    <li>ขยับตัวไปทาง <b>ซ้าย / ขวา</b> หรือเอียงตัวเพื่อบังคับทิศทางเรือ</li>
+                    <li>หรือใช้การ <b>ชูมือขวา</b> เพื่อใช้ฝ่ามือควบคุมทิศทางเรือ</li>
+                    <li><b>กำมือขวา</b> หรือยิงด้วยปืนเพื่อเก็บหีบสมบัติที่มีตัวเลขตรงกับโจทย์!</li>
+                    <li>เลี่ยงหีบสมบัติที่มีตัวเลขไม่ถูกต้อง</li>
+                </ul>
+            </div>
+            <button id="start-btn" class="btn">เข้าสู่การทดสอบระบบ 🚀</button>
+        </div>
+    </div>
+
+    <!-- Screen 2: System Check Screen -->
+    <div id="check-screen" class="screen hidden">
+        <div class="card">
+            <h1>⚙️ ตรวจสอบระบบก่อนเริ่ม</h1>
+            <p>กรุณาอนุญาตการใช้งานกล้องและรอให้ระบบเตรียมพร้อม</p>
+            
+            <div class="check-list">
+                <div class="check-item">
+                    <span>🎥 กล้อง Webcam</span>
+                    <div id="check-cam" class="spinner"></div>
+                </div>
+                <div class="check-item">
+                    <span>✋ ระบบตรวจจับมือ (MediaPipe)</span>
+                    <div id="check-hand" class="spinner"></div>
+                </div>
+                <div class="check-item">
+                    <span>🎮 ระบบ 3D Graphics (Three.js)</span>
+                    <div id="check-3d" class="spinner"></div>
+                </div>
+            </div>
+
+            <button id="launch-game-btn" class="btn" disabled>กำลังตรวจสอบ...</button>
+        </div>
+    </div>
+
+    <!-- Screen 3: Victory / Game Over Screen -->
+    <div id="end-screen" class="screen hidden">
+        <div class="card">
+            <h1 id="end-title">🎉 การผจญภัยจบลงแล้ว!</h1>
+            <p id="end-subtitle" style="font-size: 1.3rem; margin-bottom: 20px;">คุณรวบรวมสมบัติได้มากมาย!</p>
+            <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 16px; margin-bottom: 20px;">
+                <p style="font-size: 1.5rem; color: #FFD700; font-weight: 600;">คะแนนรวม: <span id="final-score">0</span> คะแนน</p>
+            </div>
+            <button id="restart-btn" class="btn">เล่นอีกครั้ง 🔄</button>
+        </div>
+    </div>
+
+    <!-- Gameplay Overlay UI -->
+    <div id="game-ui">
+        <div class="hud-top">
+            <div class="hud-box">ด่าน<span id="hud-level">1</span></div>
+            <div class="hud-box">คำถาม<span id="hud-question-num">1/5</span></div>
+            <div class="hud-box">คะแนน<span id="hud-score">0</span></div>
+            <div class="hud-box">เวลา<span id="hud-timer">60</span></div>
+        </div>
+
+        <div id="notification-banner">โจทย์: กำลังโหลด...</div>
+        <div id="popup-center">ถูกต้อง!</div>
+
+        <div class="side-controls">
+            <button id="toggle-pose" class="toggle-btn">
+                <span>ท่าทาง/เอียงตัว</span>
+                <span id="status-pose">เปิด</span>
+            </button>
+            <button id="toggle-hand" class="toggle-btn">
+                <span>ตรวจจับมือ</span>
+                <span id="status-hand">เปิด</span>
+            </button>
+        </div>
+
+        <div class="zone-left-bg"></div>
+        <div class="zone-divider-left"></div>
+        <div class="zone-divider-right"></div>
+        <div class="zone-right-bg"></div>
+
+        <div id="charge-hud-container">
+            <div class="charge-track">
+                <div id="charge-hud-fill" class="charge-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ==========================================
+           1. QUESTION DATABASE (Grade 2 Math)
+           ========================================== */
+        const QUESTION_DATABASE = [
+            // Level 1: Numbers up to 100 & Place Values
+            [
+                { q: "สามสิบเจ็ด เขียนเป็นตัวเลขฮินดูอารบิกตรงกับข้อใด?", choices: ["37", "73", "307"], correct: "37" },
+                { q: "85 ตัวเลข 8 อยู่ในหลักใด?", choices: ["หลักสิบ", "หลักหน่วย", "หลักร้อย"], correct: "หลักสิบ" },
+                { q: "เลข 4 ใน 49 มีค่าเท่าใด?", choices: ["40", "4", "400"], correct: "40" },
+                { q: "เก้าสิบเอ็ด เขียนเป็นตัวเลขไทยตรงกับข้อใด?", choices: ["๙๑", "๑๙", "๙๐๑"], correct: "๙๑" },
+                { q: "จำนวนใดมีค่ามากกว่า 68?", choices: ["72", "59", "68"], correct: "72" }
+            ],
+            // Level 2: Numbers up to 1,000
+            [
+                { q: "ห้าร้อยสี่สิบสอง เขียนเป็นตัวเลขฮินดูอารบิก?", choices: ["542", "524", "452"], correct: "542" },
+                { q: "368 ตัวเลข 3 อยู่ในหลักใด?", choices: ["หลักร้อย", "หลักสิบ", "หลักหน่วย"], correct: "หลักร้อย" },
+                { q: "709 เขียนในรูปกระจายได้อย่างไร?", choices: ["700 + 0 + 9", "700 + 90", "70 + 9"], correct: "700 + 0 + 9" },
+                { q: "800 + 50 + 4 คือจำนวนใด?", choices: ["854", "845", "584"], correct: "854" },
+                { q: "จำนวนใดมีค่าน้อยที่สุด?", choices: ["215", "301", "199"], correct: "199" }
+            ],
+            // Level 3: Advanced Place Values & Comparison
+            [
+                { q: "982 ตัวเลข 8 มีค่าเท่าใด?", choices: ["80", "8", "800"], correct: "80" },
+                { q: "หกร้อยเจ็ด เขียนเป็นตัวเลขได้อย่างไร?", choices: ["607", "670", "67"], correct: "607" },
+                { q: "400 + 30 + 0 คือจำนวนใด?", choices: ["430", "403", "340"], correct: "430" },
+                { q: "จำนวนใดมีค่ามากที่สุด?", choices: ["891", "819", "908"], correct: "908" },
+                { q: "1,000 คือจำนวนกี่หลัก?", choices: ["4 หลัก", "3 หลัก", "5 หลัก"], correct: "4 หลัก" }
+            ]
+        ];
+
+        /* ==========================================
+           2. GLOBAL GAME STATE VARIABLES
+           ========================================== */
+        let currentLevelIdx = 0;
+        let currentQuestionIdx = 0;
+        let score = 0;
+        let timeLeft = 60;
+        let timerInterval = null;
+        let isGameRunning = false;
+
+        let enablePoseControl = true;
+        let enableHandControl = true;
+
+        // Player Controls
+        let playerX = 0; // -1 (Left), 0 (Center), 1 (Right)
+        let isCharging = false;
+        let chargeProgress = 0; // 0 to 1
+
+        // Three.js Core
+        let scene, camera, renderer;
+        let playerShip;
+        let oceanMesh, skyMesh;
+        let spawnedChests = []; // Array of 3D chest objects with answers
+        let labelElements = [];
+
+        // MediaPipe & Camera
+        let webcamElement, cameraUtils;
+        let handsDetector;
+        let isHandDetected = false;
+
+        /* ==========================================
+           3. DOM ELEMENTS
+           ========================================== */
+        const startScreen = document.getElementById('start-screen');
+        const checkScreen = document.getElementById('check-screen');
+        const endScreen = document.getElementById('end-screen');
+        const gameUI = document.getElementById('game-ui');
+
+        const startBtn = document.getElementById('start-btn');
+        const launchGameBtn = document.getElementById('launch-game-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const hudLevel = document.getElementById('hud-level');
+        const hudQuestionNum = document.getElementById('hud-question-num');
+        const hudScore = document.getElementById('hud-score');
+        const hudTimer = document.getElementById('hud-timer');
+        const notificationBanner = document.getElementById('notification-banner');
+        const popupCenter = document.getElementById('popup-center');
+
+        const togglePoseBtn = document.getElementById('toggle-pose');
+        const toggleHandBtn = document.getElementById('toggle-hand');
+        const statusPose = document.getElementById('status-pose');
+        const statusHand = document.getElementById('status-hand');
+
+        const chargeHudContainer = document.getElementById('charge-hud-container');
+        const chargeHudFill = document.getElementById('charge-hud-fill');
+
+        /* ==========================================
+           4. THREE.JS SCENE SETUP
+           ========================================== */
+        function init3DScene() {
+            const container = document.getElementById('canvas-container');
+            
+            // Scene & Camera
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0e1b2e, 0.015);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 12);
+            camera.lookAt(0, 2, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xfffaed, 1.2);
+            sunLight.position.set(20, 40, 20);
+            sunLight.castShadow = true;
+            scene.add(sunLight);
+
+            // Ocean Floor / Water Plane
+            const oceanGeo = new THREE.PlaneGeometry(200, 200, 64, 64);
+            const oceanMat = new THREE.MeshStandardMaterial({
+                color: 0x1a4b84,
+                roughness: 0.2,
+                metalness: 0.1,
+                wireframe: false
+            });
+            oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
+            oceanMesh.rotation.x = -Math.PI / 2;
+            scene.add(oceanMesh);
+
+            // Create Player Ship
+            createPlayerShip();
+
+            // Handle Resize
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createPlayerShip() {
+            playerShip = new THREE.Group();
+
+            // Ship Hull
+            const hullGeo = new THREE.BoxGeometry(1.6, 0.8, 3.2);
+            const hullMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.6 });
+            const hull = new THREE.Mesh(hullGeo, hullMat);
+            hull.position.y = 0.4;
+            playerShip.add(hull);
+
+            // Mast
+            const mastGeo = new THREE.CylinderGeometry(0.1, 0.1, 3.5);
+            const mastMat = new THREE.MeshStandardMaterial({ color: 0x5c2c06 });
+            const mast = new THREE.Mesh(mastGeo, mastMat);
+            mast.position.set(0, 2, 0.2);
+            playerShip.add(mast);
+
+            // Sail
+            const sailGeo = new THREE.PlaneGeometry(2.2, 2);
+            const sailMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+            const sail = new THREE.Mesh(sailGeo, sailMat);
+            sail.position.set(0, 2.5, 0.2);
+            playerShip.add(sail);
+
+            playerShip.position.set(0, 0, 4);
+            scene.add(playerShip);
+        }
+
+        function spawnQuestionChests(questionObj) {
+            // Clear old chests & labels
+            clearChests();
+
+            const xPositions = [-5.5, 0, 5.5]; // Left, Center, Right zones
+            const choices = questionObj.choices;
+
+            choices.forEach((choiceText, index) => {
+                const chestGroup = new THREE.Group();
+
+                // Chest Body
+                const bodyGeo = new THREE.BoxGeometry(1.6, 1.2, 1.2);
+                const isTarget = choiceText === questionObj.correct;
+                const bodyMat = new THREE.MeshStandardMaterial({
+                    color: 0xd4af37, // Golden chest
+                    metalness: 0.5,
+                    roughness: 0.3
+                });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.6;
+                chestGroup.add(body);
+
+                // Set Position
+                chestGroup.position.set(xPositions[index], 0, -25);
+                scene.add(chestGroup);
+
+                // Create HTML Label overlay
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'word-label';
+                labelDiv.textContent = choiceText;
+                document.getElementById('game-ui').appendChild(labelDiv);
+
+                spawnedChests.push({
+                    mesh: chestGroup,
+                    label: labelDiv,
+                    text: choiceText,
+                    isCorrect: choiceText === questionObj.correct,
+                    laneIndex: index - 1 // -1, 0, 1
+                });
+            });
+        }
+
+        function clearChests() {
+            spawnedChests.forEach(item => {
+                scene.remove(item.mesh);
+                if (item.label && item.label.parentNode) {
+                    item.label.parentNode.removeChild(item.label);
+                }
+            });
+            spawnedChests = [];
+        }
+
+        /* ==========================================
+           5. MEDIAPIPE HAND TRACKING & WEBCAM
+           ========================================= */
+        async function setupWebcamAndHandTracking() {
+            webcamElement = document.getElementById('webcam-video');
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 }
+                });
+                webcamElement.srcObject = stream;
+                await webcamElement.play();
+
+                updateCheckStatus('check-cam', true);
+            } catch (err) {
+                console.error("Camera Access Error:", err);
+                updateCheckStatus('check-cam', false);
+                return false;
+            }
+
+            try {
+                handsDetector = new Hands({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                });
+
+                handsDetector.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.6,
+                    minTrackingConfidence: 0.6
+                });
+
+                handsDetector.onResults(onHandResults);
+
+                cameraUtils = new Camera(webcamElement, {
+                    onFrame: async () => {
+                        if (isGameRunning) {
+                            await handsDetector.send({ image: webcamElement });
+                        }
+                    },
+                    width: 640,
+                    height: 480
+                });
+
+                cameraUtils.start();
+                updateCheckStatus('check-hand', true);
+            } catch (err) {
+                console.error("MediaPipe Error:", err);
+                updateCheckStatus('check-hand', false);
+                return false;
+            }
+
+            updateCheckStatus('check-3d', true);
+            return true;
+        }
+
+        function onHandResults(results) {
+            if (!enableHandControl || !isGameRunning) return;
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                isHandDetected = true;
+                const landmarks = results.multiHandLandmarks[0];
+
+                // Wrist and Palm X Position (Horizontal movement)
+                const wristX = landmarks[0].x; // 0 (Left) to 1 (Right)
+
+                // Mirror for natural steering
+                if (wristX < 0.35) {
+                    playerX = 1; // Right
+                } else if (wristX > 0.65) {
+                    playerX = -1; // Left
+                } else {
+                    playerX = 0; // Center
+                }
+
+                // Check Fist Gesture (Charge/Shoot)
+                // Distance between Index Finger Tip (8) and Wrist (0)
+                const indexTip = landmarks[8];
+                const wrist = landmarks[0];
+                const dist = Math.hypot(indexTip.x - wrist.x, indexTip.y - wrist.y);
+
+                if (dist < 0.28) {
+                    // Fist detected! Charge
+                    isCharging = true;
+                } else {
+                    isCharging = false;
+                }
+            } else {
+                isHandDetected = false;
+                isCharging = false;
+            }
+        }
+
+        function updateCheckStatus(elementId, isSuccess) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            el.className = 'check-status ' + (isSuccess ? 'success' : 'error');
+            el.textContent = isSuccess ? '✓ พร้อมใช้งาน' : '✕ ไม่สามารถใช้งานได้';
+        }
+
+        /* ==========================================
+           6. KEYBOARD FALLBACK CONTROLS
+           ========================================== */
+        window.addEventListener('keydown', (e) => {
+            if (!isGameRunning) return;
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                playerX = -1;
+            } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                playerX = 1;
+            } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+                playerX = 0;
+            } else if (e.key === ' ' || e.key === 'Enter') {
+                isCharging = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === ' ' || e.key === 'Enter') {
+                isCharging = false;
+            }
+        });
+
+        /* ==========================================
+           7. GAMEPLAY LOOP & LOGIC
+           ========================================== */
+        function startGame() {
+            currentLevelIdx = 0;
+            currentQuestionIdx = 0;
+            score = 0;
+            
+            startScreen.classList.add('hidden');
+            checkScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            gameUI.style.display = 'block';
+
+            isGameRunning = true;
+            loadQuestion();
+            startTimer();
+        }
+
+        function loadQuestion() {
+            const levelQuestions = QUESTION_DATABASE[currentLevelIdx];
+            const currentQ = levelQuestions[currentQuestionIdx];
+
+            hudLevel.textContent = currentLevelIdx + 1;
+            hudQuestionNum.textContent = `${currentQuestionIdx + 1}/${levelQuestions.length}`;
+            hudScore.textContent = score;
+            notificationBanner.textContent = `โจทย์: ${currentQ.q}`;
+
+            spawnQuestionChests(currentQ);
+        }
+
+        function startTimer() {
+            timeLeft = 60;
+            hudTimer.textContent = timeLeft;
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!isGameRunning) return;
+                timeLeft--;
+                hudTimer.textContent = timeLeft;
+
+                if (timeLeft <= 0) {
+                    endGame(false);
+                }
+            }, 1000);
+        }
+
+        function checkAnswer(chosenChest) {
+            if (!chosenChest) return;
+
+            if (chosenChest.isCorrect) {
+                score += 20;
+                showPopup("ถูกต้อง! 🎉", "popup-green");
+            } else {
+                score = Math.max(0, score - 5);
+                showPopup("ยังไม่ถูก! ❌", "popup-red");
+            }
+
+            hudScore.textContent = score;
+
+            // Move to Next Question
+            currentQuestionIdx++;
+            const levelQuestions = QUESTION_DATABASE[currentLevelIdx];
+
+            if (currentQuestionIdx >= levelQuestions.length) {
+                // Level Complete
+                currentLevelIdx++;
+                currentQuestionIdx = 0;
+
+                if (currentLevelIdx >= QUESTION_DATABASE.length) {
+                    // All Levels Completed!
+                    endGame(true);
+                    return;
+                }
+            }
+
+            setTimeout(() => {
+                loadQuestion();
+            }, 1000);
+        }
+
+        function showPopup(text, colorClass) {
+            popupCenter.textContent = text;
+            popupCenter.className = `show ${colorClass}`;
+            setTimeout(() => {
+                popupCenter.className = '';
+            }, 900);
+        }
+
+        function endGame(isVictory) {
+            isGameRunning = false;
+            clearInterval(timerInterval);
+            gameUI.style.display = 'none';
+            clearChests();
+
+            endScreen.classList.remove('hidden');
+            document.getElementById('end-title').textContent = isVictory ? "🎉 ชนะแล้ว! คุณเป็นราชาโจรสลัด" : "⚓ หมดเวลา! จบการผจญภัย";
+            document.getElementById('final-score').textContent = score;
+        }
+
+        /* ==========================================
+           8. ANIMATION & RENDER LOOP
+           ========================================== */
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsedTime = clock.getElapsedTime();
+
+            // Ocean Wave Animation
+            if (oceanMesh) {
+                oceanMesh.position.z = (elapsedTime * 2) % 10;
+            }
+
+            if (isGameRunning) {
+                // Smooth Ship Horizontal Steering
+                const targetX = playerX * 5.5; // Smoothly move between -5.5, 0, 5.5
+                playerShip.position.x += (targetX - playerShip.position.x) * 0.1;
+                playerShip.rotation.z = -(targetX - playerShip.position.x) * 0.05; // Tilt ship
+
+                // Update Charge Mechanic
+                if (isCharging) {
+                    chargeProgress = Math.min(1, chargeProgress + 0.03);
+                    chargeHudContainer.style.display = 'flex';
+                    chargeHudFill.style.height = `${chargeProgress * 100}%`;
+
+                    // Update HUD Position near ship
+                    chargeHudContainer.style.left = `${window.innerWidth / 2 + playerShip.position.x * 25}px`;
+                    chargeHudContainer.style.top = `${window.innerHeight - 180}px`;
+
+                    if (chargeProgress >= 1) {
+                        // Fully Charged! Fire / Select chest in current lane
+                        const targetChest = spawnedChests.find(c => Math.abs(c.mesh.position.x - playerShip.position.x) < 2);
+                        if (targetChest) {
+                            checkAnswer(targetChest);
+                        }
+                        chargeProgress = 0;
+                        isCharging = false;
+                    }
+                } else {
+                    chargeProgress = Math.max(0, chargeProgress - 0.05);
+                    chargeHudFill.style.height = `${chargeProgress * 100}%`;
+                    if (chargeProgress <= 0) {
+                        chargeHudContainer.style.display = 'none';
+                    }
+                }
+
+                // Move Chests Towards Player
+                spawnedChests.forEach(chestObj => {
+                    chestObj.mesh.position.z += 0.12; // Speed of chests moving forward
+                    chestObj.mesh.rotation.y += 0.02;
+
+                    // Project 3D Chest position to 2D Screen for HTML Label
+                    const vector = chestObj.mesh.position.clone();
+                    vector.y += 1.8;
+                    vector.project(camera);
+
+                    const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                    const y = (-(vector.y * 0.5) + 0.5) * window.innerHeight;
+
+                    chestObj.label.style.left = `${x}px`;
+                    chestObj.label.style.top = `${y}px`;
+
+                    // Check Collision with Player Ship
+                    if (chestObj.mesh.position.z >= 2 && chestObj.mesh.position.z <= 5) {
+                        if (Math.abs(chestObj.mesh.position.x - playerShip.position.x) < 1.8) {
+                            checkAnswer(chestObj);
+                        }
+                    }
+                });
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        /* ==========================================
+           9. UI EVENT LISTENERS
+           ========================================== */
+        startBtn.addEventListener('click', async () => {
+            startScreen.classList.add('hidden');
+            checkScreen.classList.remove('hidden');
+
+            init3DScene();
+            const isReady = await setupWebcamAndHandTracking();
+
+            if (isReady) {
+                launchGameBtn.disabled = false;
+                launchGameBtn.textContent = 'เริ่มการผจญภัย! 🏴‍☠️';
+            } else {
+                launchGameBtn.disabled = false;
+                launchGameBtn.textContent = 'เล่นด้วยคีย์บอร์ด ⌨️';
+            }
+        });
+
+        launchGameBtn.addEventListener('click', () => {
+            startGame();
+        });
+
+        restartBtn.addEventListener('click', () => {
+            startGame();
+        });
+
+        togglePoseBtn.addEventListener('click', () => {
+            enablePoseControl = !enablePoseControl;
+            statusPose.textContent = enablePoseControl ? "เปิด" : "ปิด";
+            togglePoseBtn.className = "toggle-btn " + (enablePoseControl ? "" : "off");
+        });
+
+        toggleHandBtn.addEventListener('click', () => {
+            enableHandControl = !enableHandControl;
+            statusHand.textContent = enableHandControl ? "เปิด" : "ปิด";
+            toggleHandBtn.className = "toggle-btn " + (enableHandControl ? "" : "off");
+        });
+
+        // Start Animation Loop on load
+        window.onload = function() {
+            animate();
+        };
+    </script>
+</body>
+</html>
